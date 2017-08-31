@@ -23,3 +23,14 @@ jobs:
         template: *ci-master-f25
         timeout: 11000
 
+  fedora-25/installation-install-with-ca1:
+    requires: [fedora-25/build]
+    priority: 50
+    job:
+      class: RunPytest
+      args:
+        build_url: '{fedora-25/build_url}'
+        test_suite: test_integration/test_installation.py::TestInstallWithCA1
+        template: *ci-master-f25
+        timeout: 11000
+
