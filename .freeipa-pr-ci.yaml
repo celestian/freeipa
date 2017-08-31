@@ -12,14 +12,14 @@ jobs:
           version: 0.2.11
         timeout: 1800
 
-  fedora-25/simple_replication:
+  fedora-25/installation-install-with-ca2:
     requires: [fedora-25/build]
     priority: 50
     job:
       class: RunPytest
       args:
         build_url: '{fedora-25/build_url}'
-        test_suite: test_integration/test_installation.py
+        test_suite: test_integration/test_installation.py::TestInstallWithCA2
         template: *ci-master-f25
-        timeout: 5000
+        timeout: 11000
 
