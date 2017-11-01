@@ -40,9 +40,10 @@ from ipapython import ipautil
 from ipapython.certdb import EMPTY_TRUST_FLAGS, IPA_CA_TRUST_FLAGS
 from ipapython.certdb import get_ca_nickname, find_cert_from_txt, NSSDatabase
 from ipapython.dn import DN
-from ipalib import pkcs10, x509, api
+from ipalib import x509, api
 from ipalib.errors import CertificateOperationError
 from ipalib.install import certstore
+from ipalib.util import strip_csr_header
 from ipalib.text import _
 from ipaplatform.paths import paths
 
@@ -227,7 +228,7 @@ class CertDB(object):
         return self.nssdb.run_certutil(args, stdin, **kwargs)
 
     def create_noise_file(self):
-        if ipautil.file_exists(self.noise_fname):
+        if os.path.isfile(self.noise_fname):
             os.remove(self.noise_fname)
         with open(self.noise_fname, "w") as f:
             self.set_perms(f)
@@ -409,11 +410,11 @@ class CertDB(object):
         if self.host_name is None:
             raise RuntimeError("CA Host is not set.")
 
-        with open(certreq_fname, "r") as f:
+        with open(certreq_fname, "rb") as f:
             csr = f.read()
 
-        # We just want the CSR bits, make sure there is nothing else
-        csr = pkcs10.strip_header(csr)
+        # We just want the CSR bits, make sure there is no thing else
+        csr = strip_csr_header(csr).decode('utf8')
 
         params = {'profileId': dogtag.DEFAULT_PROFILE,
                 'cert_request_type': 'pkcs10',
@@ -461,11 +462,12 @@ class CertDB(object):
         if self.host_name is None:
             raise RuntimeError("CA Host is not set.")
 
-        with open(certreq_fname, "r") as f:
+        with open(certreq_fname, "rb") as f:
             csr = f.read()
 
         # We just want the CSR bits, make sure there is no thing else
-        csr = pkcs10.strip_header(csr)
+        csr = strip_csr_header(csr).decode('utf8')
+
 
         params = {'profileId': 'caJarSigningCert',
                 'cert_request_type': 'pkcs10',
@@ -565,7 +567,7 @@ class CertDB(object):
 
     def create_from_cacert(self):
         cacert_fname = paths.IPA_CA_CRT
-        if ipautil.file_exists(self.certdb_fname):
+        if os.path.isfile(self.certdb_fname):
             # We already have a cert db, see if it is for the same CA.
             # If it is we leave things as they are.
             with open(cacert_fname, "r") as f:
