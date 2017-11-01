@@ -21,7 +21,6 @@ import logging
 import os
 import tempfile
 import shutil
-import base64
 import glob
 import contextlib
 import nose
@@ -34,6 +33,7 @@ from ipaplatform.paths import paths
 from ipapython.dn import DN
 from ipatests.test_integration.base import IntegrationTest
 from ipatests.test_integration import create_caless_pki
+from ipatests.test_integration.create_external_ca import ExternalCA
 from ipatests.pytest_plugins.integration import tasks
 from ipalib.constants import DOMAIN_LEVEL_0
 
@@ -359,10 +359,9 @@ class CALessBase(IntegrationTest):
             expected_cacrt = f.read()
         logger.debug('Expected /etc/ipa/ca.crt contents:\n%s',
                      expected_cacrt)
-        expected_binary_cacrt = base64.b64decode(x509.strip_header(
-            expected_cacrt))
+        expected_cacrt = x509.load_unknown_x509_certificate(expected_cacrt)
         logger.debug('Expected binary CA cert:\n%r',
-                     expected_binary_cacrt)
+                     expected_cacrt)
         for host in [self.master] + self.replicas:
             # Check the LDAP entry
             ldap = host.ldap_connect()
@@ -372,7 +371,7 @@ class CALessBase(IntegrationTest):
             cert_from_ldap = entry.single_value['cACertificate']
             logger.debug('CA cert from LDAP on %s:\n%r',
                          host, cert_from_ldap)
-            assert cert_from_ldap == expected_binary_cacrt
+            assert cert_from_ldap == expected_cacrt
 
             # Verify certmonger was not started
             result = host.run_command(['getcert', 'list'], raiseonerr=False)
@@ -383,10 +382,10 @@ class CALessBase(IntegrationTest):
             remote_cacrt = host.get_file_contents(paths.IPA_CA_CRT)
             logger.debug('%s:/etc/ipa/ca.crt contents:\n%s',
                          host, remote_cacrt)
-            binary_cacrt = base64.b64decode(x509.strip_header(remote_cacrt))
+            cacrt = x509.load_unknown_x509_certificate(remote_cacrt)
             logger.debug('%s: Decoded /etc/ipa/ca.crt:\n%r',
-                         host, binary_cacrt)
-            assert expected_binary_cacrt == binary_cacrt
+                         host, cacrt)
+            assert expected_cacrt == cacrt
 
 
 class TestServerInstall(CALessBase):
@@ -1580,3 +1579,47 @@ class TestReplicaCALessToCAFull(CALessBase):
 
         ca_replica = tasks.install_ca(self.replicas[0])
         assert ca_replica.returncode == 0
+
+
+class TestServerCALessToExternalCA(CALessBase):
+    """Test server caless to extarnal CA scenario"""
+
+    def test_install_caless_server(self):
+        """Install CA-less master"""
+
+        self.create_pkcs12('ca1/server')
+        self.prepare_cacert('ca1')
+
+        master = self.install_server()
+        assert master.returncode == 0
+
+    def test_server_ipa_ca_install_external(self):
+        """Install external CA on master"""
+
+        # First step of ipa-ca-install (get CSR)
+        ca_master_pre = tasks.install_ca(self.master, external_ca=True)
+        assert ca_master_pre.returncode == 0
+
+        # Create external CA
+        external_ca = ExternalCA()
+        root_ca = external_ca.create_ca()
+
+        # Get IPA CSR as string
+        ipa_csr = self.master.get_file_contents('/root/ipa.csr')
+        # Have CSR signed by the external CA
+        ipa_ca = external_ca.sign_csr(ipa_csr)
+
+        test_dir = self.master.config.test_dir
+
+        root_ca_fname = os.path.join(test_dir, 'root_ca.crt')
+        ipa_ca_fname = os.path.join(test_dir, 'ipa_ca.crt')
+
+        # Transport certificates (string > file) to master
+        self.master.put_file_contents(root_ca_fname, root_ca)
+        self.master.put_file_contents(ipa_ca_fname, ipa_ca)
+
+        cert_files = [root_ca_fname, ipa_ca_fname]
+
+        # Continue with ipa-ca-install
+        ca_master_post = tasks.install_ca(self.master, cert_files=cert_files)
+        assert ca_master_post.returncode == 0
