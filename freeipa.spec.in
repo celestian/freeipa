@@ -86,8 +86,12 @@ BuildRequires:  openldap-devel
 # For KDB DAL version, make explicit dependency so that increase of version
 # will cause the build to fail due to unsatisfied dependencies.
 # DAL version change may cause code crash or memory leaks, it is better to fail early.
+%if 0%{?fedora} > 27
+BuildRequires: krb5-kdb-version = 7.0
+%else
 %if 0%{?fedora} > 25
 BuildRequires: krb5-kdb-version = 6.1
+%endif
 %endif
 BuildRequires:  krb5-devel >= %{krb5_version}
 # 1.27.4: xmlrpc_curl_xportparms.gssapi_delegation
@@ -283,7 +287,8 @@ Requires: python3-ipaserver = %{version}-%{release}
 %else
 Requires: python2-ipaserver = %{version}-%{release}
 %endif
-Requires: 389-ds-base >= 1.3.5.14
+# 1.3.7.6-1: https://bugzilla.redhat.com/show_bug.cgi?id=1488295
+Requires: 389-ds-base >= 1.3.7.6-1
 Requires: openldap-clients > 2.4.35-4
 Requires: nss >= 3.14.3-12.0
 Requires: nss-tools >= 3.14.3-12.0
@@ -320,9 +325,9 @@ Requires(preun): python systemd-units
 Requires(postun): python systemd-units
 Requires: policycoreutils >= 2.1.12-5
 Requires: tar
-# certmonger-0.79.4-2 fixes newlines in PEM files
-Requires(pre): certmonger >= 0.79.4-2
-Requires(pre): 389-ds-base >= 1.3.5.14
+Requires(pre): certmonger >= 0.79.5-1
+# 1.3.7.6-1: https://bugzilla.redhat.com/show_bug.cgi?id=1488295
+Requires(pre): 389-ds-base >= 1.3.7.6-1
 Requires: fontawesome-fonts
 Requires: open-sans-fonts
 Requires: openssl
@@ -540,8 +545,7 @@ Requires: libcurl >= 7.21.7-2
 Requires: xmlrpc-c >= 1.27.4
 Requires: sssd >= 1.14.0
 Requires: python-sssdconfig
-# certmonger-0.79.4-2 fixes newlines in PEM files
-Requires: certmonger >= 0.79.4-2
+Requires: certmonger >= 0.79.5-1
 Requires: nss-tools
 Requires: bind-utils
 Requires: oddjob-mkhomedir
@@ -1027,10 +1031,21 @@ mv %{buildroot}%{_bindir}/ipa-test-task %{buildroot}%{_bindir}/ipa-test-task-%{p
 ln -s %{_bindir}/ipa-run-tests-%{python2_version} %{buildroot}%{_bindir}/ipa-run-tests-2
 ln -s %{_bindir}/ipa-test-config-%{python2_version} %{buildroot}%{_bindir}/ipa-test-config-2
 ln -s %{_bindir}/ipa-test-task-%{python2_version} %{buildroot}%{_bindir}/ipa-test-task-2
-# test framework defaults to Python 2
+%endif # with_ipatests
+
+# Decide which Python (2 or 3) should be used as default for tests
+%if 0%{?with_ipatests}
+%if 0%{?with_python3}
+# Building with python3 => make it default for tests
+ln -s %{_bindir}/ipa-run-tests-%{python3_version} %{buildroot}%{_bindir}/ipa-run-tests
+ln -s %{_bindir}/ipa-test-config-%{python3_version} %{buildroot}%{_bindir}/ipa-test-config
+ln -s %{_bindir}/ipa-test-task-%{python3_version} %{buildroot}%{_bindir}/ipa-test-task
+%else
+# Building python2 only => make it default for tests
 ln -s %{_bindir}/ipa-run-tests-%{python2_version} %{buildroot}%{_bindir}/ipa-run-tests
 ln -s %{_bindir}/ipa-test-config-%{python2_version} %{buildroot}%{_bindir}/ipa-test-config
 ln -s %{_bindir}/ipa-test-task-%{python2_version} %{buildroot}%{_bindir}/ipa-test-task
+%endif # with_python3
 %endif # with_ipatests
 
 # remove files which are useful only for make uninstall

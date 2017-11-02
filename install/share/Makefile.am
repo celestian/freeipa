@@ -30,7 +30,6 @@ dist_app_DATA =				\
 	anon-princ-aci.ldif		\
 	bootstrap-template.ldif		\
 	ca-topology.uldif		\
-	caJarSigningCert.cfg.template	\
 	custodia.conf.template		\
 	default-aci.ldif		\
 	default-hbac.ldif		\
@@ -38,6 +37,7 @@ dist_app_DATA =				\
 	default-trust-view.ldif		\
 	delegation.ldif			\
 	replica-acis.ldif		\
+	replica-prevent-time-skew.ldif  \
 	ds-nfiles.ldif			\
 	dns.ldif			\
 	dnssec.ldif			\
